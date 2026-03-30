@@ -40,9 +40,16 @@ class WhisperSegAlignmentInjector:
     
     def replace_injector(self, segments_alignment, replace_input_str, unique_id):
         mapper = ASRMapper.ASRMappingTextV3()
+        input_str_head_index = 0
+        input_str_last_index = 0
+        
         for alignment in segments_alignment:
-            r = mapper.map_text(alignment["value"], replace_input_str)
+            n = len(alignment["value"])
+            input_str_last_index = input_str_head_index + n
+            k = replace_input_str[input_str_head_index:(input_str_last_index + 2)]
+            r = mapper.map_text(alignment["value"], k)
             first_index = next((x for x in r if not math.isinf(x)), None)
             last_index = next((x for x in reversed(r) if not math.isinf(x)), None)
-            alignment["value"] = replace_input_str[first_index:(last_index + 1)]
+            alignment["value"] = k[first_index:(last_index + 1)]
+            input_str_head_index = input_str_last_index + 1
         return (segments_alignment, )
