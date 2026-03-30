@@ -1,4 +1,5 @@
 import numpy as np
+import re
 
 try:
     from pypinyin import pinyin, Style
@@ -215,3 +216,122 @@ class ASRMappingTextV2:
                     mapA[i] = mapA[curr_i] + int((i - curr_i) * val_diff / gap_len)
                     
         return mapA
+    
+class ASRMappingTextV3:
+    def __init__(self):
+        # 權重設定
+        self.COST_MATCH = 0.0      # 完全匹配
+        self.COST_PINYIN = 0.4     # 拼音相同 (如: 引离/云璃, 性物/信物)
+        self.COST_MISMATCH = 1.2   # 完全不同 (調高一點，強迫走對角線)
+
+    def _get_pinyin(self, char):
+        """取得單個漢字的拼音"""
+        if not re.match(r'[\u4e00-\u9fa5]', char):
+            return char
+        res = pinyin(char, style=Style.NORMAL)
+        return res[0][0] if res else char
+
+    def _is_valid(self, char):
+        """判斷是否為有效字元（排除標點符號）"""
+        return re.match(r'[\u4e00-\u9fa5a-zA-Z0-9]', char) is not None
+
+    def sub_cost(self, a, r):
+        """計算替換代價"""
+        if a == r:
+            return self.COST_MATCH
+        if self._get_pinyin(a) == self._get_pinyin(r):
+            return self.COST_PINYIN
+        return self.COST_MISMATCH
+
+    def map_text(self, source_text: str, asr_data: str) -> list[int]:
+        # 1. 預處理：分離標點，只對有效字元做 DP
+        src_info = [(i, c) for i, c in enumerate(source_text) if self._is_valid(c)]
+        src_chars = [x[1] for x in src_info]
+        
+        n = len(src_chars)
+        m = len(asr_data)
+        
+        if n == 0: return [0] * len(source_text)
+        if m == 0: return [0] * len(source_text)
+
+        # 2. DP 表初始化
+        dp = [[0.0] * (m + 1) for _ in range(n + 1)]
+        bt = [[0] * (m + 1) for _ in range(n + 1)]
+
+        for i in range(1, n + 1):
+            dp[i][0] = i * 1.0
+            bt[i][0] = 1 # Up
+        for j in range(1, m + 1):
+            dp[0][j] = j * 1.0
+            bt[0][j] = 2 # Left
+
+        # 3. 填寫 DP 表
+        for i in range(1, n + 1):
+            for j in range(1, m + 1):
+                cost = self.sub_cost(src_chars[i-1], asr_data[j-1])
+                c_diag = dp[i-1][j-1] + cost
+                c_up   = dp[i-1][j] + 1.0
+                c_left = dp[i][j-1] + 1.0
+
+                best = c_diag
+                dir_ = 0
+                if c_up < best:
+                    best = c_up
+                    dir_ = 1
+                if c_left < best:
+                    best = c_left
+                    dir_ = 2
+                dp[i][j] = best
+                bt[i][j] = dir_
+
+        # 4. 第一次回溯：找出對應點
+        raw_map = [None] * n
+        curr_i, curr_j = n, m
+        while curr_i > 0 or curr_j > 0:
+            direction = bt[curr_i][curr_j]
+            if curr_i > 0 and curr_j > 0 and direction == 0:
+                # 只要不是完全不匹配(1.2)，就視為對應成功
+                if self.sub_cost(src_chars[curr_i-1], asr_data[curr_j-1]) < self.COST_MISMATCH:
+                    raw_map[curr_i - 1] = curr_j - 1
+                curr_i -= 1
+                curr_j -= 1
+            elif curr_i > 0 and (curr_j == 0 or direction == 1):
+                curr_i -= 1
+            else:
+                curr_j -= 1
+
+        # 5. 線性插值補全（解決開頭錯誤與結尾斷字）
+        known = [i for i, v in enumerate(raw_map) if v is not None]
+        
+        if not known:
+            filled_map = [int(i * (m-1) / (n-1)) if n > 1 else 0 for i in range(n)]
+        else:
+            filled_map = list(raw_map)
+            # 補頭
+            first_k = known[0]
+            for i in range(first_k - 1, -1, -1):
+                filled_map[i] = max(0, filled_map[i+1] - 1)
+            # 補中間
+            for k in range(len(known) - 1):
+                idx_start, idx_end = known[k], known[k+1]
+                val_start, val_end = filled_map[idx_start], filled_map[idx_end]
+                for i in range(idx_start + 1, idx_end):
+                    ratio = (i - idx_start) / (idx_end - idx_start)
+                    filled_map[i] = int(val_start + ratio * (val_end - val_start))
+            # 補尾
+            last_k = known[-1]
+            for i in range(last_k + 1, n):
+                filled_map[i] = min(m - 1, filled_map[i-1] + 1)
+
+        # 6. 映射回原始帶標點的字串
+        final_result = [0] * len(source_text)
+        valid_idx = 0
+        for i, char in enumerate(source_text):
+            if self._is_valid(char):
+                final_result[i] = filled_map[valid_idx]
+                valid_idx += 1
+            else:
+                # 標點符號跟隨前一個有效字的索引
+                final_result[i] = final_result[i-1] if i > 0 else 0
+                
+        return final_result

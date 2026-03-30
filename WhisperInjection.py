@@ -39,7 +39,7 @@ class WhisperSegAlignmentInjector:
     FUNCTION = "replace_injector"
     
     def replace_injector(self, segments_alignment, replace_input_str, unique_id):
-        mapper = ASRMapper.ASRMappingText()
+        mapper = ASRMapper.ASRMappingTextV3()
         
         for alignment in segments_alignment:
             r = mapper.map_text(alignment["value"], replace_input_str)
