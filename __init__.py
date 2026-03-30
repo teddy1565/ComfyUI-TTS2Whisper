@@ -3,6 +3,7 @@ from . import Utils
 
 NODE_CLASS_MAPPINGS = {
     "WhisperSegAlignmentInjector": WhisperInjection.WhisperSegAlignmentInjector,
+    "WhisperSegAlignmentMerge": WhisperInjection.WhisperSegAlignmentMerge,
 
     "StringToStringList": Utils.StringToStringList,
     "StringFilter": Utils.StringFilter,
@@ -10,6 +11,7 @@ NODE_CLASS_MAPPINGS = {
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "WhisperSegAlignmentInjector": "Whisper Segments Alignment Injector",
+    "WhisperSegAlignmentMerge": "Whisper Segments Alignment Merge",
     "StringToStringList": "Convert String To String List",
     "StringFilter": "String Filter"
 }
