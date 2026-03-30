@@ -335,3 +335,124 @@ class ASRMappingTextV3:
                 final_result[i] = final_result[i-1] if i > 0 else 0
                 
         return final_result
+    
+class ASRMappingTextV4:
+    def __init__(self):
+        # 權重設定：同音字 0.4, 完全不同 1.5
+        self.COST_MATCH = 0.0
+        self.COST_PINYIN = 0.4
+        self.COST_MISMATCH = 1.5
+
+    def _get_pinyin(self, char):
+        if not re.match(r'[\u4e00-\u9fa5]', char): return char
+        res = pinyin(char, style=Style.NORMAL)
+        return res[0][0] if res else char
+
+    def _is_valid(self, char):
+        return re.match(r'[\u4e00-\u9fa5a-zA-Z0-9]', char) is not None
+
+    def sub_cost(self, a, r):
+        if a == r: return self.COST_MATCH
+        if self._get_pinyin(a) == self._get_pinyin(r): return self.COST_PINYIN
+        return self.COST_MISMATCH
+
+    def map_text(self, source_text: str, asr_segments: list) -> list:
+        # 1. 串聯 ASR 片段並建立「字元 -> 時間」映射表
+        asr_full_text = ""
+        char_times = [] # 儲存每個 ASR 字元對應的 (start, end)
+        
+        for seg in asr_segments:
+            val = seg['value'].strip()
+            if not val: continue
+            # 計算該片段內每個字的預估時間 (均分)
+            duration = (seg['end'] - seg['start']) / len(val)
+            for i, char in enumerate(val):
+                asr_full_text += char
+                char_times.append({
+                    'start': seg['start'] + i * duration,
+                    'end': seg['start'] + (i + 1) * duration
+                })
+
+        # 2. 提取 Source 有效字元位置
+        src_valid_chars = [c for c in source_text if self._is_valid(c)]
+        n, m = len(src_valid_chars), len(asr_full_text)
+        if n == 0 or m == 0: return []
+
+        # 3. DP 矩陣計算
+        dp = [[0.0] * (m + 1) for _ in range(n + 1)]
+        bt = [[0] * (m + 1) for _ in range(n + 1)]
+
+        for i in range(1, n + 1): dp[i][0] = i * 1.0; bt[i][0] = 1
+        for j in range(1, m + 1): dp[0][j] = j * 1.0; bt[0][j] = 2
+
+        for i in range(1, n + 1):
+            for j in range(1, m + 1):
+                cost = self.sub_cost(src_valid_chars[i-1], asr_full_text[j-1])
+                c_diag = dp[i-1][j-1] + cost
+                c_up   = dp[i-1][j] + 1.0
+                c_left = dp[i][j-1] + 1.0
+                
+                best = c_diag; dir_ = 0
+                if c_up < best: best = c_up; dir_ = 1
+                if c_left < best: best = c_left; dir_ = 2
+                dp[i][j] = best; bt[i][j] = dir_
+
+        # 4. 回溯：找出初步對齊 (僅保留代價低於 1.0 的對應點)
+        raw_map = [None] * n
+        curr_i, curr_j = n, m
+        while curr_i > 0 or curr_j > 0:
+            direction = bt[curr_i][curr_j]
+            if curr_i > 0 and curr_j > 0 and direction == 0:
+                if self.sub_cost(src_valid_chars[curr_i-1], asr_full_text[curr_j-1]) < 1.0:
+                    raw_map[curr_i - 1] = curr_j - 1
+                curr_i -= 1; curr_j -= 1
+            elif curr_i > 0 and (curr_j == 0 or direction == 1):
+                curr_i -= 1
+            else:
+                curr_j -= 1
+
+        # 5. 強力插值補全 (處理結尾「死」或開頭「景軒」)
+        known = [i for i, v in enumerate(raw_map) if v is not None]
+        if not known:
+            # 沒對上任何字，強制線性分佈
+            final_indices = [int(i * (m-1) / (n-1)) if n > 1 else 0 for i in range(n)]
+        else:
+            final_indices = list(raw_map)
+            # 補頭：若第一個字沒對上，從對上的點往回推
+            for i in range(known[0] - 1, -1, -1):
+                final_indices[i] = max(0, final_indices[i+1] - 1)
+            # 補中間：線性插值
+            for k in range(len(known) - 1):
+                s, e = known[k], known[k+1]
+                v_s, v_e = final_indices[s], final_indices[e]
+                for i in range(s + 1, e):
+                    final_indices[i] = v_s + int((i - s) * (v_e - v_s) / (e - s))
+            # 補尾：重點修正！若最後一個字沒對上，強制對應到 ASR 最後一個索引
+            for i in range(known[-1] + 1, n):
+                # 這裡不再只是 +1，而是確保最後一個字一定指向 m-1
+                dist_to_end = n - 1 - known[-1]
+                val_dist = (m - 1) - final_indices[known[-1]]
+                final_indices[i] = final_indices[i-1] + max(1, int(val_dist / dist_to_end))
+                final_indices[i] = min(final_indices[i], m - 1)
+            
+            # 強制最後一個有效字元指向 ASR 的末尾字
+            final_indices[-1] = m - 1
+
+        # 6. 組裝回原本包含標點符號的清單
+        final_mapping = []
+        valid_ptr = 0
+        for char in source_text:
+            if self._is_valid(char):
+                idx = final_indices[valid_ptr]
+                final_mapping.append({
+                    'char': char,
+                    'asr_idx': idx,
+                    'time': char_times[idx]
+                })
+                valid_ptr += 1
+            else:
+                # 標點符號跟隨前一字時間
+                prev_time = final_mapping[-1]['time'] if final_mapping else char_times[0]
+                final_mapping.append({'char': char, 'asr_idx': -1, 'time': prev_time})
+
+        return final_mapping
