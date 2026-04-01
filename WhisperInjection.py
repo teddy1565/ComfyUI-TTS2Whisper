@@ -126,3 +126,42 @@ class WhisperSegAlignmentMerge:
             res.append(alignment_dict)
         
         return (res, )
+    
+class WhisperSegAlignmentTimeoffsetFix:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "segments_alignment": ("whisper_alignment", {
+                    "forceInput": True,
+                })
+            },
+            "hidden": {
+                "unique_id": "UNIQUE_ID"
+            }
+        }
+    
+    RETURN_TYPES = ("whisper_alignment",)
+    RETURN_NAMES = ("segments_alignment",)
+    CATEGORY = f'{MAIN_CATEGORY}'
+    FUNCTION = "timefix"
+    
+    def timefix(self, segments_alignment, unique_id):
+        start_timestamp_list = [x["start"] for x in segments_alignment]
+        start_timestamp = np.min(start_timestamp_list)
+        
+        end_timestamp_list = [x["end"] for x in segments_alignment]
+        end_timestamp = math.ceil(np.max(end_timestamp_list))
+
+        segments_size = len(segments_alignment)
+        
+        segments_alignment[segments_size - 1]["end"] = end_timestamp
+        
+        for i in range(segments_size - 1):
+            
+            segments_alignment[i + 1]["start"] = segments_alignment[i]["end"]
+        
+        return (segments_alignment, )
