@@ -1,2 +1,4 @@
 pypinyin
 numpy
+torchaudio
+torch
