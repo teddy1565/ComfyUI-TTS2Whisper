@@ -44,10 +44,20 @@ class WhisperSegAlignmentInjector:
         input_str_head_index = 0
         input_str_last_index = 0
         
+        punctuation_list = [",", ".", "!", "，", "。", ":", "；", " ", "？", "?", "：", "「", "」"]
+
+
+        
         for alignment in segments_alignment:
+            punctuation_count = 0
             n = len(alignment["value"])
             input_str_last_index = input_str_head_index + n
-            k = replace_input_str[input_str_head_index:(input_str_last_index + 2)]
+            
+            for c in alignment["value"]:
+                if c in punctuation_list:
+                    punctuation_count += 1
+
+            k = replace_input_str[input_str_head_index:(input_str_last_index + 2 + punctuation_count)]
             r = mapper.map_text(alignment["value"], k)
             first_index = next((x for x in r if not math.isinf(x)), None)
             last_index = next((x for x in reversed(r) if not math.isinf(x)), None)
@@ -82,9 +92,10 @@ class WhisperSegAlignmentMerge:
         start_timestamp_list = [x["start"] for x in segments_alignment]
         start_timestamp = np.min(start_timestamp_list)
         end_timestamp_list = [x["end"] for x in segments_alignment]
-        end_timestamp = np.max(end_timestamp_list)
+        end_timestamp = math.ceil(np.max(end_timestamp_list))
 
-        total_time = end_timestamp - start_timestamp
+        # total_time = end_timestamp - start_timestamp
+        total_time = end_timestamp - 0
         
         text = [x["value"] for x in segments_alignment]
         text = "".join(text)
@@ -110,6 +121,7 @@ class WhisperSegAlignmentMerge:
                 "end": i + interval_time
             }
             result_i += 1
+            result_i = result_i % len(result)
             i += interval_time
             res.append(alignment_dict)
         
