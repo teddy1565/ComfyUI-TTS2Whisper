@@ -137,6 +137,10 @@ class WhisperSegAlignmentTimeoffsetFix:
             "required": {
                 "segments_alignment": ("whisper_alignment", {
                     "forceInput": True,
+                }),
+                "mode": (["align_start", "align_end", "none"], {
+                    "default": "none",
+                    "tooltip": "align_start: alienment[n + 1][start] = alignment[n][end]\nalign_end: alignment[n][end] = alignment[n + 1][start]\nnone: nothing"
                 })
             },
             "hidden": {
@@ -149,7 +153,7 @@ class WhisperSegAlignmentTimeoffsetFix:
     CATEGORY = f'{MAIN_CATEGORY}'
     FUNCTION = "timefix"
     
-    def timefix(self, segments_alignment, unique_id):
+    def timefix(self, segments_alignment, mode="none", unique_id=0):
         start_timestamp_list = [x["start"] for x in segments_alignment]
         start_timestamp = np.min(start_timestamp_list)
         
@@ -159,9 +163,17 @@ class WhisperSegAlignmentTimeoffsetFix:
         segments_size = len(segments_alignment)
         
         segments_alignment[segments_size - 1]["end"] = end_timestamp
-        
-        for i in range(segments_size - 1):
+
+        if mode == "align_start":
+            for i in range(segments_size - 1):
+                segments_alignment[i + 1]["start"] = segments_alignment[i]["end"]
+    
+        elif mode == "align_end":
+            for i in range(segments_size - 1):
+                segments_alignment[i]["end"] = segments_alignment[i + 1]["start"]
             
-            segments_alignment[i + 1]["start"] = segments_alignment[i]["end"]
+        else:
+            pass
+
         
         return (segments_alignment, )
