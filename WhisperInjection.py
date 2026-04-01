@@ -138,9 +138,9 @@ class WhisperSegAlignmentTimeoffsetFix:
                 "segments_alignment": ("whisper_alignment", {
                     "forceInput": True,
                 }),
-                "mode": (["align_start", "align_end", "none"], {
+                "mode": (["align_start", "align_end", "align_auto", "none"], {
                     "default": "none",
-                    "tooltip": "align_start: alienment[n + 1][start] = alignment[n][end]\nalign_end: alignment[n][end] = alignment[n + 1][start]\nnone: nothing"
+                    "tooltip": "align_start: alienment[n + 1][start] = alignment[n][end]\nalign_end: alignment[n][end] = alignment[n + 1][start]\nalign_auto: mix 'start' and 'end' mode, make largest have more time\nnone: nothing"
                 })
             },
             "hidden": {
@@ -171,7 +171,13 @@ class WhisperSegAlignmentTimeoffsetFix:
         elif mode == "align_end":
             for i in range(segments_size - 1):
                 segments_alignment[i]["end"] = segments_alignment[i + 1]["start"]
-            
+        
+        elif mode == "align_auto":
+            for i in range(segments_size - 1):
+                if len(segments_alignment[i]["value"]) >= len(segments_alignment[i + 1]["value"]):
+                    segments_alignment[i + 1]["start"] = segments_alignment[i]["end"]
+                else:
+                    segments_alignment[i]["end"] = segments_alignment[i + 1]["start"]
         else:
             pass
 
