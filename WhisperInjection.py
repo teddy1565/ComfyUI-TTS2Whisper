@@ -61,7 +61,8 @@ class WhisperSegAlignmentInjector:
             r = mapper.map_text(alignment["value"], k)
             first_index = next((x for x in r if not math.isinf(x)), None)
             last_index = next((x for x in reversed(r) if not math.isinf(x)), None)
-            alignment["value"] = k[first_index:(last_index + 1)]
+            if isinstance(first_index, int) and isinstance(last_index, int):
+                alignment["value"] = k[first_index:(last_index + 1)]
             input_str_head_index = input_str_last_index + 1
         return (segments_alignment, )
     
