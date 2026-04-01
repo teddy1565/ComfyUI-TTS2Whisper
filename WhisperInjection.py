@@ -175,9 +175,9 @@ class WhisperSegAlignmentTimeoffsetFix:
         elif mode == "align_auto":
             for i in range(segments_size - 1):
                 if len(segments_alignment[i]["value"]) >= len(segments_alignment[i + 1]["value"]):
-                    segments_alignment[i + 1]["start"] = segments_alignment[i]["end"]
-                else:
                     segments_alignment[i]["end"] = segments_alignment[i + 1]["start"]
+                else:
+                    segments_alignment[i + 1]["start"] = segments_alignment[i]["end"]
         else:
             pass
 
