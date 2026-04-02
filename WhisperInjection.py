@@ -190,10 +190,6 @@ class WhisperSegAlignmentTimeoffsetFix:
                     segments_alignment[i]["end"] = segments_alignment[i + 1]["start"]
         else:
             pass
-
-        temp_dir = folder_paths.get_temp_directory()
-        os.makedirs(temp_dir, exist_ok=True)
-        audio_save_path = os.path.join(temp_dir, f"{uuid.uuid1()}.wav")
         
         return (segments_alignment, )
     
