@@ -5,6 +5,9 @@ import json
 import math
 import random
 import numpy as np
+import uuid
+import torchaudio
+import torch
 
 
 import nodes
@@ -187,6 +190,34 @@ class WhisperSegAlignmentTimeoffsetFix:
                     segments_alignment[i]["end"] = segments_alignment[i + 1]["start"]
         else:
             pass
-
         
         return (segments_alignment, )
+    
+class WhisperSegAlignmentAudioSaveToTemp:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "audio": ("AUDIO", {
+                    "forceInput": True,
+                })
+            },
+            "hidden": {
+                "unique_id": "UNIQUE_ID"
+            }
+        }
+    
+    RETURN_TYPES = ("AUDIOPATH",)
+    RETURN_NAMES = ("path",)
+    CATEGORY = f'{MAIN_CATEGORY}'
+    FUNCTION = "save_to_temp"
+    
+    def save_to_temp(self, audio, unique_id):
+        temp_dir = folder_paths.get_temp_directory()
+        os.makedirs(temp_dir, exist_ok=True)
+        audio_save_path = os.path.join(temp_dir, f"tts2whisper-{uuid.uuid1()}.wav")
+        torchaudio.save(audio_save_path, audio['waveform'].squeeze(0), audio["sample_rate"])
+        return (audio_save_path, )
