@@ -1,11 +1,14 @@
 from . import WhisperInjection
 from . import Utils
+from . import UnionTools
 
 NODE_CLASS_MAPPINGS = {
     "WhisperSegAlignmentInjector": WhisperInjection.WhisperSegAlignmentInjector,
     "WhisperSegAlignmentMerge": WhisperInjection.WhisperSegAlignmentMerge,
     "WhisperSegAlignmentTimeoffsetFix": WhisperInjection.WhisperSegAlignmentTimeoffsetFix,
     "WhisperSegAlignmentAudioSaveToTemp": WhisperInjection.WhisperSegAlignmentAudioSaveToTemp,
+    
+    "MFASegAlignmentRecovery": UnionTools.MFASegAlignmentRecovery,
 
     "StringToStringList": Utils.StringToStringList,
     "StringFilter": Utils.StringFilter,
@@ -16,6 +19,10 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "WhisperSegAlignmentMerge": "Whisper Segments Alignment Merge",
     "WhisperSegAlignmentTimeoffsetFix": "Whisper Segments Alignment TimeFix",
     "WhisperSegAlignmentAudioSaveToTemp": "Whisper Segments Alignment Audio Save And Get Path",
+
+    "MFASegAlignmentRecovery": "MFA Segments Alignment Recovery",
+
+
     "StringToStringList": "Convert String To String List",
     "StringFilter": "String Filter"
 }
