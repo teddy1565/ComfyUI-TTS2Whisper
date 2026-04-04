@@ -244,6 +244,9 @@ class ASRMappingTextV3:
         return self.COST_MISMATCH
 
     def map_text(self, source_text: str, asr_data: str) -> list[int]:
+        """
+        this function bigO is O(n x m)
+        """
         # 1. 預處理：分離標點，只對有效字元做 DP
         src_info = [(i, c) for i, c in enumerate(source_text) if self._is_valid(c)]
         src_chars = [x[1] for x in src_info]
